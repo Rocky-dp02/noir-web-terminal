@@ -782,6 +782,12 @@
           <h2 class="login-title">Noir Systems</h2>
           <p class="login-desc">Sign in with your S2S IBAS administrator account</p>
         </div>
+        <div class="login-warning" id="mixed-content-warning" style="color: var(--accent-warning); background-color: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); padding: 0.75rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1.5rem; display: none; text-align: left; line-height: 1.4;">
+          <strong>⚠️ Mixed Content Warning:</strong> You are accessing this site via HTTPS (<span id="current-origin"></span>). Modern browsers block insecure HTTP/WS requests from HTTPS sites to local gateways.
+          <br><br>
+          To resolve this, please run your gateway server locally and visit:
+          <a href="http://127.0.0.1:8000" style="color: var(--primary); text-decoration: underline; font-weight: 500;">http://127.0.0.1:8000</a>
+        </div>
         <div class="login-error" id="login-error">Invalid credentials</div>
         <form id="login-form">
           <div class="form-group">
@@ -877,6 +883,28 @@
       if (elements.chkAutoConfig) {
         elements.chkAutoConfig.checked = state.autoConfig;
       }
+      
+      // Initial Mixed Content Warning check
+      if (window.location.protocol === "https:" && elements.loginProxyUrl) {
+        const checkMixedContent = () => {
+          const proxyVal = elements.loginProxyUrl.value.trim();
+          const warningEl = document.getElementById("mixed-content-warning");
+          const originEl = document.getElementById("current-origin");
+          if (proxyVal.startsWith("http://") || !proxyVal.startsWith("https://")) {
+            if (warningEl && originEl) {
+              originEl.textContent = window.location.hostname;
+              warningEl.style.display = "block";
+            }
+          } else {
+            if (warningEl) {
+              warningEl.style.display = "none";
+            }
+          }
+        };
+        elements.loginProxyUrl.addEventListener("input", checkMixedContent);
+        checkMixedContent();
+      }
+
       if (state.token) {
         verifySession();
       } else {
