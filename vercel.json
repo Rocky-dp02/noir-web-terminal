@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "name": "noir-olt-ssh-console",
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/static/(.*)", "destination": "/static/$1" },
+    { "source": "/(.*)", "destination": "/static/index.html" }
+  ]
+}

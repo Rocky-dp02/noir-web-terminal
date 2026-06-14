@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Noir OLT SSH Web Console</title>
+  <!-- Google Fonts: Outfit and Fira Code for Terminal -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Premium Noir Styling System */
+    :root {
+      --bg-base: #0b0f19;
+      --bg-surface: #131b2e;
+      --bg-surface-elevated: #1e293b;
+      --primary: #14b8a6; /* Electric Teal */
+      --primary-hover: #0d9488;
+      --primary-glow: rgba(20, 184, 166, 0.15);
+      
+      --accent-success: #10b981; /* Emerald Green */
+      --accent-warning: #f59e0b; /* Amber Yellow */
+      --accent-error: #f43f5e; /* Rose Red */
+      
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-terminal: #34d399; /* Emerald/Green Terminal */
+      
+      --border-color: rgba(255, 255, 255, 0.08);
+      --font-outfit: 'Outfit', sans-serif;
+      --font-mono: 'Fira Code', monospace;
+      
+      --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-outfit);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* App Header */
+    header {
+      background-color: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--primary), #3b82f6);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px var(--primary-glow);
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -1px;
+    }
+
+    .brand-name {
+      font-weight: 600;
+      font-size: 1.25rem;
+      letter-spacing: 0.5px;
+      background: linear-gradient(to right, #ffffff, var(--text-muted));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-tag {
+      font-size: 0.75rem;
+      background: rgba(20, 184, 166, 0.1);
+      color: var(--primary);
+      border: 1px solid rgba(20, 184, 166, 0.2);
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      font-weight: 500;
+    }
+
+    .header-status-panel {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent-error);
+      display: inline-block;
+      box-shadow: 0 0 8px var(--accent-error);
+    }
+
+    .status-indicator.active {
+      background-color: var(--accent-success);
+      box-shadow: 0 0 8px var(--accent-success);
+    }
+
+    .status-indicator.connecting {
+      background-color: var(--accent-warning);
+      box-shadow: 0 0 8px var(--accent-warning);
+      animation: pulse 1.5s infinite;
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid rgba(244, 63, 94, 0.2);
+      color: var(--accent-error);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      font-family: var(--font-outfit);
+      transition: var(--transition-smooth);
+    }
+
+    .btn-logout:hover {
+      background: rgba(244, 63, 94, 0.1);
+      border-color: var(--accent-error);
+    }
+
+    /* Main Container Layout */
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left panel: OLT Search Registry */
+    .sidebar {
+      width: 320px;
+      background-color: var(--bg-surface);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      transition: var(--transition-smooth);
+    }
+
+    .search-container {
+      padding: 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .search-input-wrapper {
+      position: relative;
+      display: flex;
+    }
+
+    .search-input-wrapper input {
+      width: 100%;
+      background-color: var(--bg-base);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: var(--text-main);
+      font-family: var(--font-outfit);
+      font-size: 0.9rem;
+      transition: var(--transition-smooth);
+    }
+
+    .search-input-wrapper input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 10px rgba(20, 184, 166, 0.15);
+    }
+
+    .search-loader {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      border: 2px solid transparent;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+
+    .sidebar-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      padding: 1rem 1.25rem 0.5rem 1.25rem;
+      font-weight: 600;
+    }
+
+    .olt-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.5rem 0.75rem;
+    }
+
+    .olt-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      padding: 0.85rem 1rem;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: var(--transition-smooth);
+    }
+
+    .olt-item:hover {
+      background-color: var(--bg-surface-elevated);
+      border-color: rgba(255, 255, 255, 0.04);
+    }
+
+    .olt-item.selected {
+      background: linear-gradient(135deg, rgba(20, 184, 166, 0.08), rgba(59, 130, 246, 0.08));
+      border-color: rgba(20, 184, 166, 0.25);
+    }
+
+    .olt-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .olt-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text-main);
+    }
+
+    .olt-badge {
+      font-size: 0.7rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-weight: 500;
+      background-color: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+    }
+
+    .olt-badge.zte {
+      background-color: rgba(59, 130, 246, 0.1);
+      color: #60a5fa;
+    }
+
+    .olt-ip {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .no-results {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    /* Right panel: SSH Shell console */
+    .console-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: var(--bg-base);
+      position: relative;
+    }
+
+    .console-header {
+      background-color: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .console-details {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .console-olt-name {
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--text-main);
+    }
+
+    .console-olt-ip {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      background-color: rgba(255, 255, 255, 0.04);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+    }
+
+    .console-controls {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      font-family: var(--font-outfit);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.45rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: var(--transition-smooth);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: #000;
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--primary-hover);
+      box-shadow: 0 0 12px var(--primary-glow);
+    }
+
+    .btn-primary:disabled {
+      background-color: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      border-color: rgba(255, 255, 255, 0.15);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background-color: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Terminal Emulator Container */
+    .terminal-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: #030712; /* Rich terminal black */
+      padding: 1.5rem;
+      overflow: hidden;
+      font-family: var(--font-mono);
+      position: relative;
+    }
+
+    .terminal-output {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 1rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: var(--text-terminal);
+    }
+
+    .terminal-output .system-msg {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .terminal-output .error-msg {
+      color: var(--accent-error);
+      font-weight: 600;
+    }
+
+    .terminal-output .connection-msg {
+      color: #60a5fa;
+      font-weight: 600;
+    }
+
+    .terminal-output .user-cmd-msg {
+      color: #fff;
+      font-weight: 500;
+    }
+
+    .terminal-input-line {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 0.75rem;
+    }
+
+    .terminal-prompt {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .terminal-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    /* Interactive Terminal Toolbar */
+    .terminal-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background-color: var(--bg-surface);
+      border-top: 1px solid var(--border-color);
+      padding: 0.5rem 1.5rem;
+    }
+
+    .toolbar-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-right: 0.5rem;
+    }
+
+    .key-btn {
+      background-color: var(--bg-surface-elevated);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      padding: 0.25rem 0.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .key-btn:hover {
+      background-color: var(--primary);
+      color: #000;
+    }
+
+    /* Live Debugging Drawer */
+    .debug-drawer {
+      height: 180px;
+      background-color: #090d16;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      z-index: 5;
+    }
+
+    .debug-header {
+      background-color: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.4rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .debug-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .debug-grid {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .debug-row {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .debug-time {
+      color: #5b21b6;
+      width: 75px;
+      flex-shrink: 0;
+    }
+
+    .debug-direction {
+      width: 40px;
+      flex-shrink: 0;
+    }
+
+    .debug-direction.in {
+      color: var(--accent-success);
+    }
+
+    .debug-direction.out {
+      color: var(--primary);
+    }
+
+    .debug-payload {
+      color: #e2e8f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Login Overlay Screen */
+    .login-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg-base);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: var(--transition-smooth);
+    }
+
+    .login-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(1.05);
+    }
+
+    .login-card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      width: 100%;
+      max-width: 400px;
+      border-radius: 16px;
+      padding: 2.5rem;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(to right, var(--primary), #3b82f6);
+    }
+
+    .login-header {
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+
+    .login-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(to right, #ffffff, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .login-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+      color: var(--text-muted);
+    }
+
+    .form-input {
+      width: 100%;
+      background-color: var(--bg-base);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: #fff;
+      font-family: var(--font-outfit);
+      font-size: 0.95rem;
+      transition: var(--transition-smooth);
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 10px var(--primary-glow);
+    }
+
+    .btn-login {
+      width: 100%;
+      padding: 0.85rem;
+      font-size: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .login-error {
+      color: var(--accent-error);
+      background-color: rgba(244, 63, 94, 0.1);
+      border: 1px solid rgba(244, 63, 94, 0.2);
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+      display: none;
+      text-align: center;
+    }
+
+    /* Animations */
+    @keyframes spin {
+      to { transform: translateY(-50%) rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.1); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- App Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">N</div>
+      <div class="brand-name">Noir OLT SSH Console</div>
+      <span class="brand-tag">v2.1</span>
+    </div>
+    <div class="header-status-panel">
+      <div class="status-item">
+        <span class="status-indicator" id="api-status-dot"></span>
+        <span id="api-status-text">Disconnected</span>
+      </div>
+      <button class="btn-logout" id="btn-logout" style="display: none;">Logout</button>
+    </div>
+  </header>
+
+  <!-- App Body layout -->
+  <div class="app-body">
+    
+    <!-- Sidebar / OLT Search Registry -->
+    <div class="sidebar">
+      <div class="search-container">
+        <div class="search-input-wrapper">
+          <input type="text" id="search-input" placeholder="Search OLT name or IP..." disabled>
+          <div class="search-loader" id="search-loader"></div>
+        </div>
+      </div>
+      <div class="sidebar-title">OLT Registry</div>
+      <div class="olt-list" id="olt-list-container">
+        <div class="no-results">Authenticate to load OLT list</div>
+      </div>
+    </div>
+
+    <!-- Right Console view -->
+    <div class="console-panel">
+      
+      <!-- Console details bar -->
+      <div class="console-header">
+        <div class="console-details">
+          <div class="console-olt-name" id="console-olt-name">No OLT Selected</div>
+          <div class="console-olt-ip" id="console-olt-ip" style="display: none;">0.0.0.0</div>
+          <div id="terminal-mode-badge" style="font-size: 0.8rem; background-color: rgba(244, 63, 94, 0.15); color: var(--accent-error); border: 1px solid rgba(244, 63, 94, 0.3); padding: 0.15rem 0.5rem; border-radius: 4px; display: none; align-items: center; gap: 0.35rem; font-weight: 500;">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background-color: var(--accent-error); display: inline-block;" id="terminal-mode-indicator"></span>
+            <span id="terminal-mode-text">User Mode</span>
+          </div>
+        </div>
+        <div class="console-controls">
+          <label style="display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-muted); margin-right: 1rem; cursor: pointer;">
+            <input type="checkbox" id="chk-auto-config" checked style="accent-color: var(--primary);">
+            Auto-Config Mode
+          </label>
+          <button class="btn btn-secondary" id="btn-disconnect-ssh" disabled>Disconnect</button>
+          <button class="btn btn-primary" id="btn-connect-ssh" disabled>Connect Shell</button>
+        </div>
+      </div>
+
+      <!-- Terminal window -->
+      <div class="terminal-container">
+        <div class="terminal-output" id="terminal-output-container">
+          <div class="system-msg">Welcome to Noir OLT SSH Terminal Client. Select an OLT from the left panel and click 'Connect Shell'.</div>
+        </div>
+        <div class="terminal-input-line">
+          <span class="terminal-prompt">noir ❯</span>
+          <input type="text" class="terminal-input" id="terminal-input" placeholder="Type command here..." disabled>
+        </div>
+      </div>
+
+      <!-- Quick keys toolbar -->
+      <div class="terminal-toolbar">
+        <span class="toolbar-label">Quick keys:</span>
+        <button class="key-btn" data-key="disconnect">disconnect</button>
+        <button class="key-btn" data-key="back">back</button>
+        <button class="key-btn" data-key="help">help</button>
+        <button class="key-btn" data-key="show interface gpon">show port</button>
+        <button class="key-btn" data-key="show onu status">show onu status</button>
+      </div>
+
+      <!-- Debug frame console -->
+      <div class="debug-drawer">
+        <div class="debug-header">
+          <div class="debug-title">WebSocket Traffic Monitor (Live)</div>
+          <button class="key-btn" id="btn-clear-debug" style="font-size: 0.65rem; padding: 0.1rem 0.4rem;">Clear Logs</button>
+        </div>
+        <div class="debug-grid" id="debug-log-grid">
+          <div class="system-msg" style="font-size: 0.75rem;">Waiting for socket operations...</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Login Overlay Screen -->
+    <div class="login-overlay" id="login-overlay">
+      <div class="login-card">
+        <div class="login-header">
+          <h2 class="login-title">Noir Systems</h2>
+          <p class="login-desc">Sign in with your S2S IBAS administrator account</p>
+        </div>
+        <div class="login-error" id="login-error">Invalid credentials</div>
+        <form id="login-form">
+          <div class="form-group">
+            <label class="form-label" for="login-username">Username / Email</label>
+            <input type="text" class="form-input" id="login-username" value="test@2.com" required placeholder="name@domain.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="login-password">Password</label>
+            <input type="password" class="form-input" id="login-password" value="Ragnarok01" required placeholder="••••••••">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="login-proxy-url">Noir Gateway URL (Proxy)</label>
+            <input type="text" class="form-input" id="login-proxy-url" value="" required placeholder="http://127.0.0.1:8000">
+          </div>
+          <button type="submit" class="btn btn-primary btn-login" id="btn-submit-login">Authenticate</button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Determine API and WebSocket server addresses based on environment
+    const savedProxyUrl = localStorage.getItem("wsc_proxy_url") || "";
+    let defaultProxy = "";
+    if (savedProxyUrl) {
+      defaultProxy = savedProxyUrl;
+    } else {
+      defaultProxy = window.location.port !== "8000" ? "http://127.0.0.1:8000" : window.location.origin;
+    }
+
+    // State management
+    const state = {
+      token: localStorage.getItem("wsc_token") || null,
+      proxyUrl: defaultProxy,
+      autoConfig: localStorage.getItem("wsc_auto_config") !== "false",
+      autoConfigAttempts: { enable: 0, config: 0 },
+      selectedOlt: null,
+      sshWs: null,
+      commandHistory: [],
+      historyIndex: -1,
+      olts: []
+    };
+
+    // Helper to compute API and WS endpoints dynamically
+    function getEndpoints() {
+      const apiBase = state.proxyUrl.replace(/\/$/, "");
+      const wsProtocol = apiBase.startsWith("https") ? "wss:" : "ws:";
+      const wsHost = apiBase.replace(/^https?:\/\//, "");
+      return {
+        apiBase,
+        wsUrl: `${wsProtocol}//${wsHost}/ws/ssh`
+      };
+    }
+
+    let currentLineElement = null;
+
+    // DOM Elements
+    const elements = {
+      loginOverlay: document.getElementById("login-overlay"),
+      loginForm: document.getElementById("login-form"),
+      loginUsername: document.getElementById("login-username"),
+      loginPassword: document.getElementById("login-password"),
+      loginProxyUrl: document.getElementById("login-proxy-url"),
+      loginError: document.getElementById("login-error"),
+      btnSubmitLogin: document.getElementById("btn-submit-login"),
+      btnLogout: document.getElementById("btn-logout"),
+      apiStatusDot: document.getElementById("api-status-dot"),
+      apiStatusText: document.getElementById("api-status-text"),
+      chkAutoConfig: document.getElementById("chk-auto-config"),
+      terminalModeBadge: document.getElementById("terminal-mode-badge"),
+      terminalModeText: document.getElementById("terminal-mode-text"),
+      terminalModeIndicator: document.getElementById("terminal-mode-indicator"),
+      searchInput: document.getElementById("search-input"),
+      searchLoader: document.getElementById("search-loader"),
+      oltListContainer: document.getElementById("olt-list-container"),
+      consoleOltName: document.getElementById("console-olt-name"),
+      consoleOltIp: document.getElementById("console-olt-ip"),
+      btnConnectSsh: document.getElementById("btn-connect-ssh"),
+      btnDisconnectSsh: document.getElementById("btn-disconnect-ssh"),
+      terminalOutput: document.getElementById("terminal-output-container"),
+      terminalInput: document.getElementById("terminal-input"),
+      debugLogGrid: document.getElementById("debug-log-grid"),
+      btnClearDebug: document.getElementById("btn-clear-debug")
+    };
+
+    // Initializer
+    window.addEventListener("DOMContentLoaded", () => {
+      setupEventListeners();
+      if (elements.loginProxyUrl) {
+        elements.loginProxyUrl.value = state.proxyUrl;
+      }
+      if (elements.chkAutoConfig) {
+        elements.chkAutoConfig.checked = state.autoConfig;
+      }
+      if (state.token) {
+        verifySession();
+      } else {
+        showLogin();
+      }
+    });
+
+    function setupEventListeners() {
+      // Login Form
+      elements.loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const username = elements.loginUsername.value.trim();
+        const password = elements.loginPassword.value.trim();
+        const proxyUrl = elements.loginProxyUrl.value.trim() || "http://127.0.0.1:8000";
+        
+        state.proxyUrl = proxyUrl;
+        localStorage.setItem("wsc_proxy_url", proxyUrl);
+        const endpoints = getEndpoints();
+        
+        elements.btnSubmitLogin.disabled = true;
+        elements.btnSubmitLogin.textContent = "Authenticating...";
+        elements.loginError.style.display = "none";
+
+        try {
+          const res = await fetch(`${endpoints.apiBase}/api/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
+          const data = await res.json();
+          
+          if (res.status === 200 && data.status) {
+            state.token = data.data.token;
+            localStorage.setItem("wsc_token", state.token);
+            hideLogin();
+            initDashboard();
+          } else {
+            showLoginError(data.message || "Invalid credentials");
+          }
+        } catch (err) {
+          showLoginError("Failed to connect to proxy server.");
+        } finally {
+          elements.btnSubmitLogin.disabled = false;
+          elements.btnSubmitLogin.textContent = "Authenticate";
+        }
+      });
+
+      // Logout
+      elements.btnLogout.addEventListener("click", () => {
+        disconnectSsh();
+        state.token = null;
+        localStorage.removeItem("wsc_token");
+        showLogin();
+      });
+
+      // Auto Config mode checkbox
+      elements.chkAutoConfig.addEventListener("change", (e) => {
+        state.autoConfig = e.target.checked;
+        localStorage.setItem("wsc_auto_config", e.target.checked);
+      });
+
+      // OLT Search input with debouncing
+      let searchTimeout = null;
+      elements.searchInput.addEventListener("input", () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          searchOlts(elements.searchInput.value.trim());
+        }, 300);
+      });
+
+      // Connect / Disconnect Buttons
+      elements.btnConnectSsh.addEventListener("click", () => {
+        connectSsh();
+      });
+
+      elements.btnDisconnectSsh.addEventListener("click", () => {
+        disconnectSsh();
+      });
+
+      // Terminal input key handling
+      elements.terminalInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          const cmd = elements.terminalInput.value.trim();
+          if (cmd) {
+            sendTerminalCommand(cmd);
+            elements.terminalInput.value = "";
+          }
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          if (state.commandHistory.length > 0) {
+            if (state.historyIndex === -1) {
+              state.historyIndex = state.commandHistory.length - 1;
+            } else if (state.historyIndex > 0) {
+              state.historyIndex--;
+            }
+            elements.terminalInput.value = state.commandHistory[state.historyIndex];
+          }
+        } else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          if (state.commandHistory.length > 0) {
+            if (state.historyIndex !== -1 && state.historyIndex < state.commandHistory.length - 1) {
+              state.historyIndex++;
+              elements.terminalInput.value = state.commandHistory[state.historyIndex];
+            } else {
+              state.historyIndex = -1;
+              elements.terminalInput.value = "";
+            }
+          }
+        }
+      });
+
+      // Quick Keys toolbar
+      document.querySelectorAll(".key-btn[data-key]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const command = btn.getAttribute("data-key");
+          if (state.sshWs && state.sshWs.readyState === WebSocket.OPEN) {
+            appendTerminalOutput(`\n${command}`, "user-cmd-msg");
+            sendTerminalCommand(command, false);
+          }
+        });
+      });
+
+      // Clear debug log
+      elements.btnClearDebug.addEventListener("click", () => {
+        elements.debugLogGrid.innerHTML = "";
+      });
+    }
+
+    // Auth screen transitions
+    function showLogin() {
+      elements.loginOverlay.classList.remove("hidden");
+      elements.btnLogout.style.display = "none";
+      updateApiStatus("Disconnected", false);
+      elements.searchInput.disabled = true;
+    }
+
+    function hideLogin() {
+      elements.loginOverlay.classList.add("hidden");
+      elements.btnLogout.style.display = "block";
+    }
+
+    function showLoginError(msg) {
+      elements.loginError.textContent = msg;
+      elements.loginError.style.display = "block";
+    }
+
+    // Verification check
+    async function verifySession() {
+      const endpoints = getEndpoints();
+      try {
+        const res = await fetch(`${endpoints.apiBase}/api/session`, {
+          headers: { "wsc-token": state.token }
+        });
+        const data = await res.json();
+        if (res.status === 200 && data.status) {
+          hideLogin();
+          initDashboard();
+        } else {
+          showLogin();
+        }
+      } catch (err) {
+        showLogin();
+      }
+    }
+
+    // Dashboard loading
+    function initDashboard() {
+      updateApiStatus("Active", true);
+      elements.searchInput.disabled = false;
+      searchOlts(""); // Initial search loads all OLTs
+    }
+
+    // Status management
+    function updateApiStatus(text, isActive, isConnecting = false) {
+      elements.apiStatusText.textContent = text;
+      elements.apiStatusDot.className = "status-indicator";
+      if (isActive) elements.apiStatusDot.classList.add("active");
+      if (isConnecting) elements.apiStatusDot.classList.add("connecting");
+    }
+
+    // Dynamic prompt mode detector
+    function updateTerminalMode(msg) {
+      if (!state.sshWs) {
+        elements.terminalModeBadge.style.display = "none";
+        return;
+      }
+      
+      // Get the complete accumulated text of the last terminal line
+      const lastLineText = currentLineElement ? currentLineElement.textContent.trim() : "";
+      
+      // Verify that this is a real prompt from our selected OLT (contains OLT name)
+      if (!state.selectedOlt || !lastLineText.includes(state.selectedOlt.oltName)) {
+        return;
+      }
+      
+      let mode = null;
+      let color = "";
+      let bg = "";
+      let border = "";
+      
+      const isHuawei = state.selectedOlt && state.selectedOlt.type && state.selectedOlt.type.toUpperCase().includes("HUAWEI");
+      const isZte = state.selectedOlt && state.selectedOlt.type && state.selectedOlt.type.toUpperCase().includes("ZTE");
+      
+      if (lastLineText.endsWith("(config)#")) {
+        mode = "Config Mode";
+        color = "var(--accent-success)";
+        bg = "rgba(16, 185, 129, 0.15)";
+        border = "rgba(16, 185, 129, 0.3)";
+      } else if (lastLineText.endsWith("#") || lastLineText.endsWith(">#")) {
+        mode = "Privilege Mode";
+        color = "var(--accent-warning)";
+        bg = "rgba(245, 158, 11, 0.15)";
+        border = "rgba(245, 158, 11, 0.3)";
+        
+        // Reactive Auto-Config: if in Privilege mode, enter Config mode (Huawei/ZTE only)
+        if (state.autoConfig && (isHuawei || isZte) && state.autoConfigAttempts && state.autoConfigAttempts.config < 1) {
+          state.autoConfigAttempts.config++;
+          const configCmd = isZte ? "configure terminal" : "config";
+          
+          setTimeout(() => {
+            appendTerminalOutput(`\n[Auto] Privilege mode detected. Entering config mode (${configCmd})...`, "system-msg");
+            sendTerminalCommand(configCmd, false);
+          }, 600);
+        }
+      } else if (lastLineText.endsWith(">")) {
+        mode = "User Mode";
+        color = "var(--accent-error)";
+        bg = "rgba(244, 63, 94, 0.15)";
+        border = "rgba(244, 63, 94, 0.3)";
+        
+        // Reactive Auto-Config: if in User mode, enter Privilege mode (Huawei/ZTE only)
+        if (state.autoConfig && (isHuawei || isZte) && state.autoConfigAttempts && state.autoConfigAttempts.enable < 1) {
+          state.autoConfigAttempts.enable++;
+          setTimeout(() => {
+            appendTerminalOutput("\n[Auto] User mode detected. Elevating prompt...", "system-msg");
+            sendTerminalCommand("enable", false);
+          }, 600);
+        }
+      }
+      
+      if (mode) {
+        elements.terminalModeText.textContent = mode;
+        elements.terminalModeIndicator.style.backgroundColor = color;
+        elements.terminalModeBadge.style.color = color;
+        elements.terminalModeBadge.style.backgroundColor = bg;
+        elements.terminalModeBadge.style.borderColor = border;
+        elements.terminalModeBadge.style.display = "inline-flex";
+      }
+    }
+
+    // Fetch and search OLT list
+    async function searchOlts(query) {
+      const endpoints = getEndpoints();
+      elements.searchLoader.style.display = "block";
+      try {
+        const res = await fetch(`${endpoints.apiBase}/api/olt-list?q=${encodeURIComponent(query)}`, {
+          headers: { "wsc-token": state.token }
+        });
+        const data = await res.json();
+        if (res.status === 200 && data.status) {
+          state.olts = data.data.oltList || [];
+          renderOltList(state.olts);
+        } else {
+          elements.oltListContainer.innerHTML = `<div class="no-results">${data.message || "Failed to search"}</div>`;
+        }
+      } catch (err) {
+        elements.oltListContainer.innerHTML = `<div class="no-results">Network error querying registry.</div>`;
+      } finally {
+        elements.searchLoader.style.display = "none";
+      }
+    }
+
+    // Rendering OLT elements
+    function renderOltList(olts) {
+      elements.oltListContainer.innerHTML = "";
+      if (olts.length === 0) {
+        elements.oltListContainer.innerHTML = '<div class="no-results">No matches found</div>';
+        return;
+      }
+
+      olts.forEach(olt => {
+        const item = document.createElement("div");
+        item.className = "olt-item";
+        if (state.selectedOlt && state.selectedOlt.id === olt.id) {
+          item.classList.add("selected");
+        }
+
+        const typeBadge = olt.type ? `<span class="olt-badge ${olt.type.toLowerCase()}">${olt.type}</span>` : '';
+
+        item.innerHTML = `
+          <div class="olt-item-header">
+            <span class="olt-name">${olt.oltName || 'Unknown OLT'}</span>
+            ${typeBadge}
+          </div>
+          <div class="olt-ip">${olt.oltIp || '0.0.0.0'}</div>
+        `;
+
+        item.addEventListener("click", () => {
+          document.querySelectorAll(".olt-item").forEach(el => el.classList.remove("selected"));
+          item.classList.add("selected");
+          selectOlt(olt);
+        });
+
+        elements.oltListContainer.appendChild(item);
+      });
+    }
+
+    function selectOlt(olt) {
+      state.selectedOlt = olt;
+      elements.consoleOltName.textContent = olt.oltName;
+      elements.consoleOltIp.textContent = olt.oltIp;
+      elements.consoleOltIp.style.display = "block";
+      
+      // Connection controls enablement
+      if (!state.sshWs) {
+        elements.btnConnectSsh.disabled = false;
+        elements.btnDisconnectSsh.disabled = true;
+      }
+    }
+
+    // Connect to OLT SSH WS Proxy
+    async function connectSsh() {
+      if (!state.selectedOlt) return;
+      const endpoints = getEndpoints();
+      
+      state.autoConfigAttempts = { enable: 0, config: 0 };
+      
+      appendTerminalOutput(`\n*** Initiating SSH credentials lookup for OLT ${state.selectedOlt.oltName}...`, "system-msg");
+      elements.btnConnectSsh.disabled = true;
+      updateApiStatus("Connecting", false, true);
+
+      try {
+        // Request unique session ID
+        appendTerminalOutput(`*** Negotiating secure session ID...`, "system-msg");
+        const res = await fetch(`${endpoints.apiBase}/api/session-id`, {
+          headers: { "wsc-token": state.token }
+        });
+        const data = await res.json();
+        
+        if (res.status !== 200 || !data.status) {
+          throw new Error(data.message || "Failed to get session ID");
+        }
+
+        const sessionId = data.data.sessionId;
+        appendTerminalOutput(`*** Session ID verified: [${sessionId}]`, "system-msg");
+        appendTerminalOutput(`*** Opening socket gateway pipeline...`, "system-msg");
+
+        // Open WS Proxy Connection
+        const wsUrl = `${endpoints.wsUrl}?token=${encodeURIComponent(state.token)}&sessionId=${encodeURIComponent(sessionId)}&oltName=${encodeURIComponent(state.selectedOlt.oltName)}`;
+
+        logDebug("OUT", { type: "CONNECT", sessionId, oltName: state.selectedOlt.oltName });
+        state.sshWs = new WebSocket(wsUrl);
+
+        state.sshWs.onopen = () => {
+          appendTerminalOutput(`*** WebSocket gateway open. Waiting for target terminal...`, "system-msg");
+          elements.btnDisconnectSsh.disabled = false;
+        };
+
+        state.sshWs.onmessage = (e) => {
+          try {
+            const frame = JSON.parse(e.data);
+            logDebug("IN", frame);
+            
+            if (frame.type === "SERVER_LINE") {
+              appendTerminalOutput(frame.message);
+              updateTerminalMode(frame.message);
+            } else if (frame.type === "CONNECTION") {
+              if (frame.connection) {
+                appendTerminalOutput(`\n*** Connected to SSH Session for ${state.selectedOlt.oltName} ***`, "connection-msg");
+                appendTerminalOutput(`*** (Type 'disconnect' or 'back' to exit, keys/commands are live) ***\n`, "system-msg");
+                elements.terminalInput.disabled = false;
+                elements.terminalInput.focus();
+                updateApiStatus("Shell Connected", true);
+              } else {
+                appendTerminalOutput(`\n*** Disconnected by remote SSH host ***\n`, "system-msg");
+                disconnectSsh();
+              }
+            } else if (frame.type === "ERROR") {
+              appendTerminalOutput(`\n*** Remote Shell Error: ${frame.message} ***\n`, "error-msg");
+              disconnectSsh();
+            }
+          } catch (err) {
+            appendTerminalOutput(e.data);
+          }
+        };
+
+        state.sshWs.onclose = () => {
+          appendTerminalOutput(`\n*** WebSocket connection closed ***\n`, "system-msg");
+          disconnectSsh();
+        };
+
+        state.sshWs.onerror = (err) => {
+          appendTerminalOutput(`\n*** WebSocket error occurred ***\n`, "error-msg");
+          disconnectSsh();
+        };
+
+      } catch (err) {
+        appendTerminalOutput(`\n*** Connection failed: ${err.message} ***\n`, "error-msg");
+        elements.btnConnectSsh.disabled = false;
+        updateApiStatus("Active", true);
+      }
+    }
+
+    function disconnectSsh() {
+      if (state.sshWs) {
+        try {
+          state.sshWs.send(JSON.stringify({ type: "DISCONNECT" }));
+          logDebug("OUT", { type: "DISCONNECT" });
+          state.sshWs.close();
+        } catch (e) {}
+        state.sshWs = null;
+      }
+      
+      elements.terminalInput.disabled = true;
+      elements.btnDisconnectSsh.disabled = true;
+      elements.terminalModeBadge.style.display = "none";
+      currentLineElement = null;
+      
+      if (state.selectedOlt) {
+        elements.btnConnectSsh.disabled = false;
+      }
+      
+      updateApiStatus("Active", true);
+    }
+
+    function sendTerminalCommand(command, addToHistory = true) {
+      if (!state.sshWs || state.sshWs.readyState !== WebSocket.OPEN) {
+        appendTerminalOutput("\n*** Error: Terminal is offline ***", "error-msg");
+        return;
+      }
+
+      if (addToHistory) {
+        appendTerminalOutput(`\nnoir ❯ ${command}`, "user-cmd-msg");
+        state.commandHistory.push(command);
+        state.historyIndex = -1;
+      }
+
+      const trimmed = command.trim().toLowerCase();
+      if (trimmed === "disconnect" || trimmed === "back" || trimmed === "exit") {
+        disconnectSsh();
+        return;
+      }
+
+      const payload = {
+        type: "USER_LINE",
+        command: command
+      };
+      
+      state.sshWs.send(JSON.stringify(payload));
+      logDebug("OUT", payload);
+    }
+
+    // Text formatting tools for terminal
+    function appendTerminalOutput(text, className = "") {
+      // If a className is provided, start on a fresh line
+      if (className) {
+        currentLineElement = null;
+      }
+      
+      // Split ONLY by newlines (\r\n or \n) to preserve standalone \r carriage returns
+      const lines = text.split(/\r\n|\n/);
+      
+      lines.forEach((lineText, idx) => {
+        // If idx > 0, we encountered a newline and need to start a new line element
+        if (idx > 0) {
+          currentLineElement = null;
+        }
+        
+        if (!currentLineElement) {
+          currentLineElement = document.createElement("span");
+          if (className) {
+            currentLineElement.className = className;
+          }
+          elements.terminalOutput.appendChild(currentLineElement);
+        }
+        
+        // Handle carriage return \r (clear line to overwrite from beginning)
+        if (lineText.includes('\r')) {
+          const parts = lineText.split('\r');
+          lineText = parts[parts.length - 1];
+          currentLineElement.textContent = "";
+        }
+        
+        // Handle backspaces \b (character deletion)
+        if (lineText.includes('\b')) {
+          for (let char of lineText) {
+            if (char === '\b') {
+              if (currentLineElement.textContent.length > 0) {
+                currentLineElement.textContent = currentLineElement.textContent.slice(0, -1);
+              }
+            } else {
+              currentLineElement.textContent += char;
+            }
+          }
+        } else {
+          currentLineElement.textContent += lineText;
+        }
+        
+        // If this is not the last line segment, insert a line break
+        if (idx < lines.length - 1) {
+          elements.terminalOutput.appendChild(document.createElement("br"));
+        }
+      });
+      
+      elements.terminalOutput.scrollTop = elements.terminalOutput.scrollHeight;
+    }
+
+    // Monitoring WS frames
+    function logDebug(direction, payload) {
+      const row = document.createElement("div");
+      row.className = "debug-row";
+      
+      const time = new Date().toLocaleTimeString();
+      const dirText = direction === "IN" ? "◀ IN" : "▶ OUT";
+      const dirClass = direction === "IN" ? "in" : "out";
+      
+      row.innerHTML = `
+        <span class="debug-time">[${time}]</span>
+        <span class="debug-direction ${dirClass}">${dirText}</span>
+        <span class="debug-payload">${JSON.stringify(payload)}</span>
+      `;
+      
+      elements.debugLogGrid.appendChild(row);
+      elements.debugLogGrid.scrollTop = elements.debugLogGrid.scrollHeight;
+    }
+
+  </script>
+</body>
+</html>
